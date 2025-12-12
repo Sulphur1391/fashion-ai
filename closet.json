@@ -1,0 +1,67 @@
+{
+  "clothes": [
+    {
+      "id": "cloth_001",
+      "type": "셔츠",
+      "color": "화이트",
+      "style": "포멀",
+      "material": "면",
+      "season": "사계절",
+      "image_url": ""
+    },
+    {
+      "id": "cloth_002",
+      "type": "바지",
+      "color": "네이비",
+      "style": "포멀",
+      "material": "데님",
+      "season": "사계절",
+      "image_url": ""
+    },
+    {
+      "id": "cloth_003",
+      "type": "맨투맨",
+      "color": "베이지",
+      "style": "캐쥬얼",
+      "material": "면",
+      "season": "봄",
+      "image_url": ""
+    },
+    {
+      "id": "cloth_004",
+      "type": "티셔츠",
+      "color": "블랙",
+      "style": "미니멀",
+      "material": "면",
+      "season": "여름",
+      "image_url": ""
+    },
+    {
+      "id": "cloth_005",
+      "type": "치마",
+      "color": "핑크",
+      "style": "러블리",
+      "material": "폴리",
+      "season": "봄",
+      "image_url": ""
+    },
+    {
+      "id": "cloth_006",
+      "type": "후드",
+      "color": "블랙",
+      "style": "스트릿",
+      "material": "면",
+      "season": "가을",
+      "image_url": ""
+    },
+    {
+      "id": "cloth_007",
+      "type": "반바지",
+      "color": "베이지",
+      "style": "캐쥬얼",
+      "material": "면",
+      "season": "여름",
+      "image_url": ""
+    }
+  ]
+}
