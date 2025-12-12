@@ -1,30 +1,48 @@
-from typing import List, Optional
 from uuid import UUID as UUID_type
-
-from models import SessionLocal, Cloth
+from typing import List, Optional, Dict, Any
+from models import SessionLocal, Cloth, cloth_to_dict, cloth_list_to_dicts
 
 
 class ClosetRepository:
     """
     clothes_table 에 대한 CRUD를 담당하는 레이어
+    항상 JSON 직렬화 가능한 dict만 반환하도록 통일
     """
 
-    def get_all_clothes(self) -> List[Cloth]:
+    def get_all_clothes(self) -> Dict[str, Any]:
         session = SessionLocal()
         try:
-            return session.query(Cloth).all()
+            clothes: List[Cloth] = session.query(Cloth).all()
+            return {
+                "success": True,
+                "data": cloth_list_to_dicts(clothes)  # ★ ORM → dict 리스트
+            }
+        except Exception as e:
+            session.rollback()
+            return {"success": False, "error": str(e)}
         finally:
             session.close()
 
-    def get_cloth_by_id(self, cloth_id: str) -> Optional[Cloth]:
+    def get_cloth_by_id(self, cloth_id: str) -> Dict[str, Any]:
         """
         cloth_id 는 uuid 문자열로 들어온다고 가정
         """
         session = SessionLocal()
         try:
-            return session.query(Cloth).filter(
+            cloth = session.query(Cloth).filter(
                 Cloth.cloth_id == cloth_id
             ).first()
+
+            if not cloth:
+                return {"success": False, "error": "NOT_FOUND"}
+
+            return {
+                "success": True,
+                "data": cloth_to_dict(cloth)  # ★ ORM → dict
+            }
+        except Exception as e:
+            session.rollback()
+            return {"success": False, "error": str(e)}
         finally:
             session.close()
 
@@ -39,7 +57,7 @@ class ClosetRepository:
         item_type_id: Optional[str] = None,
         color_id: Optional[int] = None,
         material_id: Optional[int] = None,
-    ) -> Cloth:
+    ) -> Dict[str, Any]:
         session = SessionLocal()
         try:
             cloth = Cloth(
@@ -56,10 +74,13 @@ class ClosetRepository:
             session.add(cloth)
             session.commit()
             session.refresh(cloth)
-            return cloth
-        except Exception:
+            return {
+                "success": True,
+                "data": cloth_to_dict(cloth)  # ★ ORM → dict
+            }
+        except Exception as e:
             session.rollback()
-            raise
+            return {"success": False, "error": str(e)}
         finally:
             session.close()
 
@@ -67,7 +88,7 @@ class ClosetRepository:
         self,
         cloth_id: str,
         **fields
-    ) -> Optional[Cloth]:
+    ) -> Dict[str, Any]:
         """
         fields: name, image_url, user_id, category_id, style_id, season_id,
                 item_type_id, color_id, material_id 등의 일부 또는 전체
@@ -78,7 +99,7 @@ class ClosetRepository:
                 Cloth.cloth_id == cloth_id
             ).first()
             if not cloth:
-                return None
+                return {"success": False, "error": "NOT_FOUND"}
 
             for key, value in fields.items():
                 if hasattr(cloth, key) and value is not None:
@@ -86,26 +107,30 @@ class ClosetRepository:
 
             session.commit()
             session.refresh(cloth)
-            return cloth
-        except Exception:
+            return {
+                "success": True,
+                "data": cloth_to_dict(cloth)  # ★ ORM → dict
+            }
+        except Exception as e:
             session.rollback()
-            raise
+            return {"success": False, "error": str(e)}
         finally:
             session.close()
 
-    def delete_cloth(self, cloth_id: str) -> bool:
+    def delete_cloth(self, cloth_id: str) -> Dict[str, Any]:
         session = SessionLocal()
         try:
             cloth = session.query(Cloth).filter(
                 Cloth.cloth_id == cloth_id
             ).first()
             if not cloth:
-                return False
+                return {"success": False, "error": "NOT_FOUND"}
+
             session.delete(cloth)
             session.commit()
-            return True
-        except Exception:
+            return {"success": True, "data": None}
+        except Exception as e:
             session.rollback()
-            raise
+            return {"success": False, "error": str(e)}
         finally:
             session.close()

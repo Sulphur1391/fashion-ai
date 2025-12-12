@@ -42,7 +42,13 @@ def home():
 def get_clothes():
     """전체 옷장 조회"""
     try:
-        clothes = closet.get_all_clothes()
+        result = closet.get_all_clothes()
+
+        if not result.get("success"):
+            return jsonify(result), 500
+
+        clothes = result.get("data", [])
+
         return jsonify({
             "success": True,
             "count": len(clothes),
@@ -68,36 +74,32 @@ def add_cloth():
                 "error": "필수 항목이 없습니다: name"
             }), 400
 
-        # 선택 필드 정리
-        allowed_fields = [
-            "name",
-            "image_url",
-            "user_id",
-            "category_id",
-            "style_id",
-            "season_id",
-            "item_type_id",
-            "color_id",
-            "material_id",
-        ]
-        data = {k: cloth_data.get(k) for k in allowed_fields}
-
-        # int 필드 캐스팅
+        # int 필드 캐스팅 함수
         def to_int_or_none(v):
             try:
                 return int(v) if v is not None else None
             except (ValueError, TypeError):
                 return None
 
-        for int_field in ["category_id", "color_id", "material_id"]:
-            data[int_field] = to_int_or_none(data[int_field])
+        result = closet.add_cloth(
+            name=cloth_data.get("name"),
+            image_url=cloth_data.get("image_url"),
+            user_id=cloth_data.get("user_id"),
+            category_id=to_int_or_none(cloth_data.get("category_id")),
+            style_id=cloth_data.get("style_id"),
+            season_id=cloth_data.get("season_id"),
+            item_type_id=cloth_data.get("item_type_id"),
+            color_id=to_int_or_none(cloth_data.get("color_id")),
+            material_id=to_int_or_none(cloth_data.get("material_id")),
+        )
 
-        saved = closet.add_cloth(data)
+        if not result.get("success"):
+            return jsonify(result), 500
 
         return jsonify({
             "success": True,
             "message": "옷이 추가되었습니다",
-            "cloth": saved
+            "cloth": result["data"]
         })
 
     except Exception as e:
@@ -119,18 +121,19 @@ def delete_cloth():
                 "error": "cloth_id가 필요합니다"
             }), 400
 
-        success = closet.delete_cloth(cloth_id)
+        result = closet.delete_cloth(cloth_id)
 
-        if success:
+        if result.get("success"):
             return jsonify({
                 "success": True,
                 "message": f"옷이 삭제되었습니다: {cloth_id}"
             })
         else:
+            status = 404 if result.get("error") == "NOT_FOUND" else 500
             return jsonify({
                 "success": False,
-                "error": "옷을 찾을 수 없습니다"
-            }), 404
+                "error": result.get("error", "삭제 실패")
+            }), status
 
     except Exception as e:
         return jsonify({
@@ -176,19 +179,17 @@ def update_cloth():
             if int_field in update_fields:
                 update_fields[int_field] = to_int_or_none(update_fields[int_field])
 
-        updated = closet.update_cloth(cloth_id, update_fields)
+        result = closet.update_cloth(cloth_id, **update_fields)
 
-        if updated:
-            return jsonify({
-                "success": True,
-                "message": f"옷이 수정되었습니다: {cloth_id}",
-                "cloth": updated
-            })
-        else:
-            return jsonify({
-                "success": False,
-                "error": "옷을 찾을 수 없습니다"
-            }), 404
+        if not result.get("success"):
+            status = 404 if result.get("error") == "NOT_FOUND" else 500
+            return jsonify(result), status
+
+        return jsonify({
+            "success": True,
+            "message": f"옷이 수정되었습니다: {cloth_id}",
+            "cloth": result["data"]
+        })
 
     except Exception as e:
         return jsonify({
@@ -218,7 +219,11 @@ def recommend():
         weather = data['weather']
         schedule = data['schedule']
 
-        clothes = closet.get_all_clothes()
+        repo_result = closet.get_all_clothes()
+        if not repo_result.get("success"):
+            return jsonify(repo_result), 500
+
+        clothes = repo_result.get("data", [])
 
         if not clothes:
             return jsonify({
@@ -226,8 +231,7 @@ def recommend():
                 "error": "옷장이 비어있습니다. /api/clothes/add로 옷을 추가해주세요."
             }), 400
 
-        # fashion_ai.FashionRecommendationAI 가 기대하는 포맷에 맞게 넘겨야 함
-        # 기존 코드에서 clothes를 그냥 리스트(dict)로 넘겼다면 그대로 유지
+        # fashion_ai.FashionRecommendationAI 가 기대하는 포맷에 맞게 dict 리스트 그대로 전달
         result = ai.recommend(
             clothes=clothes,
             weather=weather,
@@ -258,7 +262,9 @@ def recommend():
 def health():
     """서버 상태 체크"""
     try:
-        clothes_count = len(closet.get_all_clothes())
+        result = closet.get_all_clothes()
+        clothes = result.get("data", []) if result.get("success") else []
+        clothes_count = len(clothes)
     except Exception:
         clothes_count = 0
 
@@ -281,7 +287,8 @@ if __name__ == '__main__':
     print("=" * 50)
 
     try:
-        clothes = closet.get_all_clothes()
+        result = closet.get_all_clothes()
+        clothes = result.get("data", []) if result.get("success") else []
         print(f"👕 현재 옷장: {len(clothes)}개")
     except Exception as e:
         print(f"⚠️ 옷장 로드 오류: {e}")

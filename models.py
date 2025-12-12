@@ -59,6 +59,35 @@ class Cloth(Base):
         server_default=func.now()
     )
 
+    
+def cloth_to_dict(cloth):
+    if cloth is None:
+        return None
+
+    return {
+        "cloth_id": str(cloth.cloth_id),   # UUID → 문자열
+        "user_id": str(cloth.user_id) if cloth.user_id else None,
+
+        "category_id": cloth.category_id,
+        "color_id": cloth.color_id,
+        "material_id": cloth.material_id,
+        "style_id": str(cloth.style_id) if cloth.style_id else None,
+        "season_id": str(cloth.season_id) if cloth.season_id else None,
+        "item_type_id": str(cloth.item_type_id) if cloth.item_type_id else None,
+
+        "image_url": cloth.image_url,
+        "brand": cloth.brand,
+        "size": cloth.size,
+        "fit": cloth.fit,
+        "notes": cloth.notes,
+
+        "created_at": cloth.created_at.isoformat() if cloth.created_at else None,
+        "updated_at": cloth.updated_at.isoformat() if cloth.updated_at else None,
+    }
+
+def cloth_list_to_dicts(clothes):
+    return [cloth_to_dict(c) for c in clothes]
+
 
 def init_db():
     """
