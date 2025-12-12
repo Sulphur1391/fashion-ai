@@ -1,114 +1,111 @@
-from typing import List, Dict
+from typing import List, Optional
+from uuid import UUID as UUID_type
+
 from models import SessionLocal, Cloth
 
 
 class ClosetRepository:
     """
-    기존 ClosetLoader와 동일한 인터페이스를 유지하면서
-    PostgreSQL DB를 사용하는 버전
+    clothes_table 에 대한 CRUD를 담당하는 레이어
     """
 
-    def get_all_clothes(self) -> List[Dict]:
-        """전체 옷 조회"""
-        db = SessionLocal()
+    def get_all_clothes(self) -> List[Cloth]:
+        session = SessionLocal()
         try:
-            clothes = db.query(Cloth).all()
-            return [self._cloth_to_dict(c) for c in clothes]
+            return session.query(Cloth).all()
         finally:
-            db.close()
+            session.close()
 
-    def add_cloth(self, cloth_data: Dict) -> bool:
+    def get_cloth_by_id(self, cloth_id: str) -> Optional[Cloth]:
         """
-        옷 추가 (ID 중복이면 False)
-        cloth_data 예시 (기존 JSON/API 포맷 기준):
-        {
-            "id": 1,
-            "name": "흰색 셔츠",
-            "type": "top",
-            "color": "white",
-            "style": "casual",
-            "material": "cotton",
-            "season": "spring"
-        }
+        cloth_id 는 uuid 문자열로 들어온다고 가정
         """
-        db = SessionLocal()
+        session = SessionLocal()
         try:
-            # id 중복 체크
-            exists = db.query(Cloth).filter(Cloth.id == cloth_data["id"]).first()
-            if exists:
-                return False
+            return session.query(Cloth).filter(
+                Cloth.cloth_id == cloth_id
+            ).first()
+        finally:
+            session.close()
 
+    def add_cloth(
+        self,
+        name: str,
+        image_url: Optional[str] = None,
+        user_id: Optional[str] = None,
+        category_id: Optional[int] = None,
+        style_id: Optional[str] = None,
+        season_id: Optional[str] = None,
+        item_type_id: Optional[str] = None,
+        color_id: Optional[int] = None,
+        material_id: Optional[int] = None,
+    ) -> Cloth:
+        session = SessionLocal()
+        try:
             cloth = Cloth(
-                id=cloth_data["id"],
-                name=cloth_data.get("name", ""),              # name 필드 추가
-                cloth_type=cloth_data.get("type", ""),        # JSON의 "type" → DB의 "cloth_type"
-                color=cloth_data.get("color"),
-                style=cloth_data.get("style"),
-                material=cloth_data.get("material"),
-                season=cloth_data.get("season"),
+                name=name,
+                image_url=image_url,
+                user_id=user_id,
+                category_id=category_id,
+                style_id=style_id,
+                season_id=season_id,
+                item_type_id=item_type_id,
+                color_id=color_id,
+                material_id=material_id,
             )
-            db.add(cloth)
-            db.commit()
-            return True
+            session.add(cloth)
+            session.commit()
+            session.refresh(cloth)
+            return cloth
+        except Exception:
+            session.rollback()
+            raise
         finally:
-            db.close()
+            session.close()
 
-    def delete_cloth(self, cloth_id: int) -> bool:
-        """옷 삭제 (성공시 True, 없으면 False)"""
-        db = SessionLocal()
+    def update_cloth(
+        self,
+        cloth_id: str,
+        **fields
+    ) -> Optional[Cloth]:
+        """
+        fields: name, image_url, user_id, category_id, style_id, season_id,
+                item_type_id, color_id, material_id 등의 일부 또는 전체
+        """
+        session = SessionLocal()
         try:
-            cloth = db.query(Cloth).filter(Cloth.id == cloth_id).first()
+            cloth = session.query(Cloth).filter(
+                Cloth.cloth_id == cloth_id
+            ).first()
+            if not cloth:
+                return None
+
+            for key, value in fields.items():
+                if hasattr(cloth, key) and value is not None:
+                    setattr(cloth, key, value)
+
+            session.commit()
+            session.refresh(cloth)
+            return cloth
+        except Exception:
+            session.rollback()
+            raise
+        finally:
+            session.close()
+
+    def delete_cloth(self, cloth_id: str) -> bool:
+        session = SessionLocal()
+        try:
+            cloth = session.query(Cloth).filter(
+                Cloth.cloth_id == cloth_id
+            ).first()
             if not cloth:
                 return False
-            db.delete(cloth)
-            db.commit()
+            session.delete(cloth)
+            session.commit()
             return True
+        except Exception:
+            session.rollback()
+            raise
         finally:
-            db.close()
-
-    def update_cloth(self, cloth_id: int, cloth_data: Dict) -> bool:
-        """
-        옷 수정 (성공시 True, 없으면 False)
-        cloth_data에는 변경할 필드만 넣으면 됨.
-        예: {"color": "black", "style": "formal"}
-        """
-        db = SessionLocal()
-        try:
-            cloth = db.query(Cloth).filter(Cloth.id == cloth_id).first()
-            if not cloth:
-                return False
-
-            # API에서 사용하는 키 → 모델 필드 이름으로 매핑
-            key_mapping = {
-                "type": "cloth_type",  # 외부 key "type" → 모델 field "cloth_type"
-            }
-
-            for key, value in cloth_data.items():
-                if key == "id":
-                    continue  # id는 수정하지 않음
-
-                # key 매핑 (예: type → cloth_type)
-                model_key = key_mapping.get(key, key)
-
-                if hasattr(cloth, model_key):
-                    setattr(cloth, model_key, value)
-
-            db.commit()
-            return True
-        finally:
-            db.close()
-
-    def _cloth_to_dict(self, cloth: Cloth) -> Dict:
-        """
-        DB 객체 → dict (API 응답용)
-        기존 JSON 구조(id, type, ...)를 유지하기 위해 여기서 이름 매핑
-        """
-        return {
-            "id": cloth.id,
-            "name": cloth.name,
-            "type": cloth.cloth_type,   # DB의 cloth_type → 응답의 type
-            "color": cloth.color,
-            "style": cloth.style,
-            "material": cloth.material,
-            "season": cloth.season,
-        }
+            session.close()

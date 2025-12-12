@@ -1,38 +1,69 @@
-# models.py
 import os
-from sqlalchemy import Column, String, Integer, create_engine
-from sqlalchemy.orm import declarative_base, sessionmaker
+import uuid
+from dotenv import load_dotenv
 
-# 1) Render에서 설정한 PostgreSQL URL 읽기
-#    일반적으로 DATABASE_URL 이름을 많이 씀
+from sqlalchemy import create_engine, Column, Integer, String, DateTime
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy.sql import func
+
+load_dotenv()
+
+# Render / 로컬 공용 DB URL
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
-if not DATABASE_URL:
-    raise RuntimeError("DATABASE_URL 환경변수가 설정되어 있지 않습니다.")
-
-# 2) postgres:// → postgresql:// 호환 처리
-if DATABASE_URL.startswith("postgres://"):
-    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
-
-# 3) 엔진, 세션, Base
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 
-# 4) 옷 테이블 모델
 class Cloth(Base):
-    __tablename__ = "clothes"
+    """
+    이미 존재하는 clothes_table 스키마에 맞춘 ORM 모델
 
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, nullable=False)
-    cloth_type = Column(String, nullable=False)
-    color = Column(String, nullable=False)
-    style = Column(String, nullable=False)
-    material = Column(String, nullable=False)
-    season = Column(String, nullable=False)
+    columns:
+      - cloth_id      uuid (PK)
+      - user_id       uuid
+      - category_id   integer
+      - style_id      uuid
+      - season_id     uuid
+      - item_type_id  uuid
+      - color_id      integer
+      - material_id   integer
+      - name          varchar(255) not null
+      - image_url     varchar(255)
+      - created_at    timestamptz
+    """
+    __tablename__ = "clothes_table"
+
+    cloth_id = Column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4
+    )
+
+    user_id = Column(UUID(as_uuid=True), nullable=True)
+    style_id = Column(UUID(as_uuid=True), nullable=True)
+    season_id = Column(UUID(as_uuid=True), nullable=True)
+    item_type_id = Column(UUID(as_uuid=True), nullable=True)
+
+    category_id = Column(Integer, nullable=True)
+    color_id = Column(Integer, nullable=True)
+    material_id = Column(Integer, nullable=True)
+
+    name = Column(String(255), nullable=False)
+    image_url = Column(String(255), nullable=True)
+
+    created_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now()
+    )
 
 
 def init_db():
-    """앱 시작 시 한 번 호출해서 테이블 없으면 생성"""
+    """
+    이미 DB에 clothes_table이 있으니:
+    - 새로운 테이블 만들 필요 없으면 호출 안 해도 됨
+    - 혹시 다른 테이블을 auto-create 하고 싶으면 여기서 처리
+    """
     Base.metadata.create_all(bind=engine)

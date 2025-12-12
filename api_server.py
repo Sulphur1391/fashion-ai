@@ -9,12 +9,11 @@ from models import init_db
 app = Flask(__name__)
 CORS(app)
 
-# 환경변수에서 API 키 가져오기 (없으면 기본값 사용)
 load_dotenv()
 API_KEY = os.environ.get('ANTHROPIC_API_KEY')
 ai = FashionRecommendationAI(api_key=API_KEY)
 
-# DB 테이블 생성
+# DB 테이블 생성 (이미 clothes_table 있으면 다른 테이블만 생성)
 init_db()
 
 # DB 기반 옷장
@@ -25,7 +24,7 @@ closet = ClosetRepository()
 def home():
     return """
     <h1>👗 패션 추천 AI 서버</h1>
-    <p>옷장 데이터: PostgreSQL DB (clothes 테이블)</p>
+    <p>옷장 데이터: PostgreSQL DB (clothes_table)</p>
     <h3>📡 API 목록</h3>
     <ul>
         <li><strong>GET /api/clothes</strong> - 전체 옷장 조회</li>
@@ -58,41 +57,48 @@ def get_clothes():
 
 @app.route('/api/clothes/add', methods=['POST'])
 def add_cloth():
-    """옷 추가"""
+    """옷 추가 (clothes_table 스키마 기준)"""
     try:
         cloth_data = request.json or {}
 
-        # name 필드 포함해서 모두 필수
-        required_fields = ['id', 'name', 'type', 'color', 'style', 'material', 'season']
-        for field in required_fields:
-            if field not in cloth_data:
-                return jsonify({
-                    "success": False,
-                    "error": f"필수 항목이 없습니다: {field}"
-                }), 400
-
-        # id를 정수로 강제 변환
-        try:
-            cloth_data['id'] = int(cloth_data['id'])
-        except (ValueError, TypeError):
+        # 필수: name만
+        if 'name' not in cloth_data or not cloth_data['name']:
             return jsonify({
                 "success": False,
-                "error": "id는 숫자여야 합니다"
+                "error": "필수 항목이 없습니다: name"
             }), 400
 
-        success = closet.add_cloth(cloth_data)
+        # 선택 필드 정리
+        allowed_fields = [
+            "name",
+            "image_url",
+            "user_id",
+            "category_id",
+            "style_id",
+            "season_id",
+            "item_type_id",
+            "color_id",
+            "material_id",
+        ]
+        data = {k: cloth_data.get(k) for k in allowed_fields}
 
-        if success:
-            return jsonify({
-                "success": True,
-                "message": "옷이 추가되었습니다",
-                "cloth": cloth_data
-            })
-        else:
-            return jsonify({
-                "success": False,
-                "error": "옷 추가 실패 (중복 ID일 수 있습니다)"
-            }), 400
+        # int 필드 캐스팅
+        def to_int_or_none(v):
+            try:
+                return int(v) if v is not None else None
+            except (ValueError, TypeError):
+                return None
+
+        for int_field in ["category_id", "color_id", "material_id"]:
+            data[int_field] = to_int_or_none(data[int_field])
+
+        saved = closet.add_cloth(data)
+
+        return jsonify({
+            "success": True,
+            "message": "옷이 추가되었습니다",
+            "cloth": saved
+        })
 
     except Exception as e:
         return jsonify({
@@ -103,7 +109,7 @@ def add_cloth():
 
 @app.route('/api/clothes/delete', methods=['DELETE'])
 def delete_cloth():
-    """옷 삭제"""
+    """옷 삭제 (cloth_id: uuid 문자열)"""
     try:
         cloth_id = request.args.get('cloth_id')
 
@@ -113,21 +119,12 @@ def delete_cloth():
                 "error": "cloth_id가 필요합니다"
             }), 400
 
-        # 쿼리 파라미터를 정수로 변환
-        try:
-            cloth_id_int = int(cloth_id)
-        except ValueError:
-            return jsonify({
-                "success": False,
-                "error": "cloth_id는 숫자여야 합니다"
-            }), 400
-
-        success = closet.delete_cloth(cloth_id_int)
+        success = closet.delete_cloth(cloth_id)
 
         if success:
             return jsonify({
                 "success": True,
-                "message": f"옷이 삭제되었습니다: {cloth_id_int}"
+                "message": f"옷이 삭제되었습니다: {cloth_id}"
             })
         else:
             return jsonify({
@@ -144,35 +141,48 @@ def delete_cloth():
 
 @app.route('/api/clothes/update', methods=['PUT'])
 def update_cloth():
-    """옷 수정"""
+    """옷 수정 (cloth_id 기반)"""
     try:
         cloth_data = request.json or {}
 
-        if 'id' not in cloth_data:
+        cloth_id = cloth_data.get('cloth_id')
+        if not cloth_id:
             return jsonify({
                 "success": False,
-                "error": "id가 필요합니다"
+                "error": "cloth_id가 필요합니다"
             }), 400
 
-        # id를 정수로 변환
-        try:
-            cloth_id = int(cloth_data['id'])
-        except (ValueError, TypeError):
-            return jsonify({
-                "success": False,
-                "error": "id는 숫자여야 합니다"
-            }), 400
+        allowed_fields = [
+            "name",
+            "image_url",
+            "user_id",
+            "category_id",
+            "style_id",
+            "season_id",
+            "item_type_id",
+            "color_id",
+            "material_id",
+        ]
+        update_fields = {k: cloth_data.get(k) for k in allowed_fields if k in cloth_data}
 
-        # dict 안에도 정수로 유지
-        cloth_data['id'] = cloth_id
+        # int 필드 캐스팅
+        def to_int_or_none(v):
+            try:
+                return int(v) if v is not None else None
+            except (ValueError, TypeError):
+                return None
 
-        success = closet.update_cloth(cloth_id, cloth_data)
+        for int_field in ["category_id", "color_id", "material_id"]:
+            if int_field in update_fields:
+                update_fields[int_field] = to_int_or_none(update_fields[int_field])
 
-        if success:
+        updated = closet.update_cloth(cloth_id, update_fields)
+
+        if updated:
             return jsonify({
                 "success": True,
                 "message": f"옷이 수정되었습니다: {cloth_id}",
-                "cloth": cloth_data
+                "cloth": updated
             })
         else:
             return jsonify({
@@ -216,6 +226,8 @@ def recommend():
                 "error": "옷장이 비어있습니다. /api/clothes/add로 옷을 추가해주세요."
             }), 400
 
+        # fashion_ai.FashionRecommendationAI 가 기대하는 포맷에 맞게 넘겨야 함
+        # 기존 코드에서 clothes를 그냥 리스트(dict)로 넘겼다면 그대로 유지
         result = ai.recommend(
             clothes=clothes,
             weather=weather,
@@ -253,23 +265,21 @@ def health():
     return jsonify({
         "status": "ok",
         "message": "서버 정상 작동 중",
-        "data_source": "PostgreSQL: clothes 테이블",
+        "data_source": "PostgreSQL: clothes_table",
         "total_clothes": clothes_count
     })
 
 
 if __name__ == '__main__':
-    # 환경변수에서 포트 가져오기 (Render 등 배포 플랫폼용)
     port = int(os.environ.get('PORT', 5000))
 
     print("=" * 50)
     print("👗 패션 추천 AI 서버 시작!")
     print("=" * 50)
-    print(f"📁 데이터 소스: PostgreSQL (clothes 테이블)")
+    print(f"📁 데이터 소스: PostgreSQL (clothes_table)")
     print(f"🌐 포트: {port}")
     print("=" * 50)
 
-    # 초기 옷 개수 확인
     try:
         clothes = closet.get_all_clothes()
         print(f"👕 현재 옷장: {len(clothes)}개")
@@ -278,6 +288,5 @@ if __name__ == '__main__':
 
     print("=" * 50)
 
-    # 배포 환경에서는 debug=False
     debug_mode = os.environ.get('FLASK_ENV') != 'production'
     app.run(host='0.0.0.0', port=port, debug=debug_mode)
