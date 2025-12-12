@@ -54,13 +54,6 @@ class Cloth(Base):
     created_at = Column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
-    updated_at = Column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        onupdate=func.now(),
-        nullable=False,
-    )
-
 
 # ---------- DB 초기화 함수 (api_server 에서 import 하는 것) ----------
 
@@ -99,9 +92,6 @@ def cloth_to_dict(cloth):
 
         "created_at": cloth.created_at.isoformat()
         if getattr(cloth, "created_at", None)
-        else None,
-        "updated_at": cloth.updated_at.isoformat()
-        if getattr(cloth, "updated_at", None)
         else None,
     }
 
