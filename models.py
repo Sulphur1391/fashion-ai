@@ -36,6 +36,40 @@ class Cloth(Base):
         server_default=text("gen_random_uuid()"),
     )
 
+class Style(Base):
+    __tablename__ = "styles"
+
+    style_id = Column(UUID(as_uuid=True), primary_key=True)
+    style_name = Column(String(50), nullable=False)
+
+
+class Season(Base):
+    __tablename__ = "seasons"
+
+    season_id = Column(UUID(as_uuid=True), primary_key=True)
+    season_name = Column(String(50), nullable=False)
+
+
+class ItemType(Base):
+    __tablename__ = "item_types"
+
+    item_type_id = Column(UUID(as_uuid=True), primary_key=True)
+    type_name = Column(String(50), nullable=False)
+
+
+class ColorCode(Base):
+    __tablename__ = "color_codes"
+
+    color_id = Column(Integer, primary_key=True)
+    color_name = Column(String(50), nullable=False)
+
+
+class MaterialCode(Base):
+    __tablename__ = "material_codes"
+
+    material_id = Column(Integer, primary_key=True)
+    material_name = Column(String(50), nullable=False)
+
     user_id = Column(UUID(as_uuid=True), nullable=True)
 
     # 기본 정보
