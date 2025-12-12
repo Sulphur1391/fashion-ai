@@ -44,8 +44,8 @@ class FashionRecommendationAI:
         try:
             message = self.client.messages.create(
                 # 실제 사용 가능한 최신 Sonnet 모델 이름으로 교체해서 사용하세요.
-                # 예: "claude-3-5-sonnet-20241022"
-                model="claude-3-5-sonnet-20241022",
+               
+                model="claude-sonnet-4-20250514",
                 max_tokens=2000,
                 messages=[{"role": "user", "content": prompt}]
             )
