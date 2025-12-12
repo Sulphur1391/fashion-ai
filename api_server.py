@@ -1,10 +1,10 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from fashion_ai import FashionRecommendationAI
-from closet_loader import ClosetLoader
-import json
+from closet_repository import ClosetRepository
 import os
 from dotenv import load_dotenv
+from models import init_db         
 
 
 app = Flask(__name__)
@@ -15,13 +15,18 @@ load_dotenv()
 
 API_KEY = os.environ.get('ANTHROPIC_API_KEY')
 ai = FashionRecommendationAI(api_key=API_KEY)
-closet = ClosetLoader("closet.json")
+
+# DB 테이블 생성
+init_db()
+
+# DB 기반 옷장
+closet = ClosetRepository()
 
 @app.route('/')
 def home():
     return """
     <h1>👗 패션 추천 AI 서버</h1>
-    <p>옷장 데이터: closet.json</p>
+    <p>옷장 데이터: PostgreSQL DB (clothes 테이블)</p>
     <h3>📡 API 목록</h3>
     <ul>
         <li><strong>GET /api/clothes</strong> - 전체 옷장 조회</li>
@@ -215,7 +220,7 @@ def health():
     return jsonify({
         "status": "ok",
         "message": "서버 정상 작동 중",
-        "data_source": "closet.json",
+        "data_source": "PostgreSQL: clothes 테이블",
         "total_clothes": clothes_count
     })
 
