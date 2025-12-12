@@ -26,27 +26,14 @@ Base = declarative_base()
 
 class Cloth(Base):
     """
-    이미 존재하는 clothes_table 스키마에 맞춘 ORM 모델
-
-    columns:
-      - cloth_id      uuid (PK)
-      - user_id       uuid
-      - category_id   integer
-      - style_id      uuid
-      - season_id     uuid
-      - item_type_id  uuid
-      - color_id      integer
-      - material_id   integer
-      - name          varchar(255) not null
-      - image_url     varchar(255)
-      - created_at    timestamptz
+    clothes_table 스키마에 맞춘 ORM 모델
     """
     __tablename__ = "clothes_table"
 
     cloth_id = Column(
         UUID(as_uuid=True),
         primary_key=True,
-        server_default=text("gen_random_uuid()"),  # Postgres 함수 사용 중이라고 가정
+        server_default=text("gen_random_uuid()"),
     )
 
     user_id = Column(UUID(as_uuid=True), nullable=True)
@@ -63,11 +50,26 @@ class Cloth(Base):
     season_id = Column(UUID(as_uuid=True), nullable=True)
     item_type_id = Column(UUID(as_uuid=True), nullable=True)
 
-    # 생성 시간
+    # 생성/수정 시간
     created_at = Column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
-    
+    updated_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+# ---------- DB 초기화 함수 (api_server 에서 import 하는 것) ----------
+
+def init_db():
+    """
+    모든 모델에 대한 테이블을 생성.
+    기존 테이블이 있으면 그대로 두고, 없을 때만 생성함.
+    """
+    Base.metadata.create_all(bind=engine)
 
 
 # ---------- 직렬화 유틸 ----------
@@ -98,7 +100,9 @@ def cloth_to_dict(cloth):
         "created_at": cloth.created_at.isoformat()
         if getattr(cloth, "created_at", None)
         else None,
-        
+        "updated_at": cloth.updated_at.isoformat()
+        if getattr(cloth, "updated_at", None)
+        else None,
     }
 
 
