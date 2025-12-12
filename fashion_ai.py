@@ -13,8 +13,19 @@ class FashionRecommendationAI:
     def recommend(self, clothes, weather, schedule):
         """패션 추천 메인 함수
 
-        :param clothes: [{id, name, type, color, style, material, season}, ...]
-        :param weather: {"temp": float/int, "condition": str}
+        :param clothes: [
+            {
+                "id": str,          # UUID 문자열
+                "name": str,
+                "category": str,    # 상의/하의/신발/아우터
+                "type": str,        # 셔츠/바지/티셔츠...
+                "color": str,       # 화이트/블랙...
+                "style": str,       # 캐쥬얼/포멀...
+                "material": str,    # 면/니트/데님/폴리/린넨/패딩/스웨이드/레더
+                "season": str       # 봄/여름/가을/겨울/사계절
+            }, ...
+        ]
+        :param weather: {"temp": float|int, "condition": str}
         :param schedule: str (예: "출근", "데이트", "야외 활동")
         """
         # 1. 날씨에 맞는 옷 필터링
@@ -32,8 +43,9 @@ class FashionRecommendationAI:
         # 3. Claude에게 물어보기
         try:
             message = self.client.messages.create(
-                # 실제 사용 가능한 최신 Sonnet 모델 이름으로 교체해서 사용
-                model="claude-sonnet-4-20250514",
+                # 실제 사용 가능한 최신 Sonnet 모델 이름으로 교체해서 사용하세요.
+                # 예: "claude-3-5-sonnet-20241022"
+                model="claude-3-5-sonnet-20241022",
                 max_tokens=2000,
                 messages=[{"role": "user", "content": prompt}]
             )
@@ -62,10 +74,10 @@ class FashionRecommendationAI:
         suitable = []
         
         for item in clothes:
-            season = item.get('season')
-            material = item.get('material')
+            season = item.get('season')     # 봄/여름/가을/겨울/사계절
+            material = item.get('material') # 면/니트/데님/폴리/린넨/패딩/스웨이드/레더
 
-            # 계절 기준
+            # --- 계절 기준 ---
             if season == '사계절':
                 season_ok = True
             elif temp is not None and temp < 10 and season == '겨울':
@@ -77,14 +89,17 @@ class FashionRecommendationAI:
             else:
                 season_ok = False
             
-            # 재질 기준
+            # --- 재질 기준 ---
             if material is None:
                 material_ok = False
-            elif temp is not None and temp < 15 and material in ['니트', '가죽']:
+            elif temp is not None and temp < 15 and material in ['니트', '패딩', '레더', '스웨이드']:
+                # 추울 때: 두껍고 보온성 있는 재질
                 material_ok = True
             elif temp is not None and 15 <= temp < 25 and material in ['면', '데님', '폴리']:
+                # 선선~약간 따뜻: 중간 두께
                 material_ok = True
             elif temp is not None and temp >= 25 and material in ['린넨', '면']:
+                # 더울 때: 통풍 잘 되는 재질
                 material_ok = True
             else:
                 material_ok = False
@@ -104,6 +119,7 @@ class FashionRecommendationAI:
             clothes_text += f"""
 - ID: {item.get('id')}
   이름: {item.get('name', '')}
+  카테고리: {item.get('category')}
   종류: {item.get('type')}
   색상: {item.get('color')}
   스타일: {item.get('style')}
@@ -129,23 +145,28 @@ class FashionRecommendationAI:
 2. 색상이 잘 어울리는 조합
 3. 스타일이 통일된 코디
 4. 상의와 하의는 반드시 선택 (아우터는 필요시에만)
-5. 옷의 ID는 위에 주어진 정수 ID만 사용
+5. 옷의 ID는 위에 주어진 문자열 ID만 사용
 
 ## 응답 형식 (JSON만 출력)
 다음과 같은 형식의 JSON만 출력하세요. 설명 텍스트는 넣지 마세요.
 
 {{
     "top": {{
-        "item_id": 0,
+        "item_id": "상의로 선택한 옷의 ID(문자열)",
         "name": "상의 이름",
         "reason": "이 상의를 선택한 이유"
     }},
     "bottom": {{
-        "item_id": 0,
+        "item_id": "하의로 선택한 옷의 ID(문자열)",
         "name": "하의 이름",
         "reason": "이 하의를 선택한 이유"
     }},
     "outer": {{
+        "item_id": null,
+        "name": null,
+        "reason": null
+    }},
+    "shoes": {{
         "item_id": null,
         "name": null,
         "reason": null
@@ -157,8 +178,9 @@ class FashionRecommendationAI:
 
 **중요**
 - 반드시 위 목록에 있는 옷의 ID만 사용하세요.
-- ID는 정수입니다.
+- ID는 문자열이며, 위에 보여준 그대로 사용해야 합니다.
 - 아우터가 필요 없으면 "outer"의 값은 모두 null로 설정하세요.
+- 신발을 선택할 수 있다면 shoes에 채우고, 없으면 null로 두세요.
 - JSON 형식만 출력하고 다른 설명은 절대 추가하지 마세요.
 """
         return prompt
@@ -185,11 +207,12 @@ if __name__ == "__main__":
     API_KEY = os.environ.get('ANTHROPIC_API_KEY')
     ai = FashionRecommendationAI(api_key=API_KEY)
 
-    # 샘플 옷 데이터 (id를 정수로)
+    # 샘플 옷 데이터 (실제 서버에서는 closet.get_ai_ready_clothes(user_id) 결과를 사용)
     sample_clothes = [
         {
-            "id": 1,
+            "id": "uuid-1",
             "name": "화이트 셔츠",
+            "category": "상의",
             "type": "셔츠",
             "color": "화이트",
             "style": "포멀",
@@ -197,8 +220,9 @@ if __name__ == "__main__":
             "season": "사계절"
         },
         {
-            "id": 2,
+            "id": "uuid-2",
             "name": "네이비 슬랙스",
+            "category": "하의",
             "type": "바지",
             "color": "네이비",
             "style": "포멀",
@@ -206,8 +230,9 @@ if __name__ == "__main__":
             "season": "사계절"
         },
         {
-            "id": 3,
+            "id": "uuid-3",
             "name": "블랙 티셔츠",
+            "category": "상의",
             "type": "티셔츠",
             "color": "블랙",
             "style": "캐쥬얼",

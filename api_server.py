@@ -204,6 +204,14 @@ def recommend():
     try:
         data = request.json or {}
 
+        # 🔹 사용자 구분: user_id 필수
+        user_id = data.get('user_id')
+        if not user_id:
+            return jsonify({
+                "success": False,
+                "error": "user_id가 없습니다"
+            }), 400
+
         if not data.get('weather'):
             return jsonify({
                 "success": False,
@@ -219,11 +227,12 @@ def recommend():
         weather = data['weather']
         schedule = data['schedule']
 
-        repo_result = closet.get_all_clothes()
-        if not repo_result.get("success"):
-            return jsonify(repo_result), 500
+        # 🔹 기존: 전체 옷장 코드값 그대로 사용
+        # repo_result = closet.get_all_clothes()
+        # clothes = repo_result.get("data", [])
 
-        clothes = repo_result.get("data", [])
+        # 🔹 변경: 특정 사용자 + AI-ready 포맷(한글 라벨)으로 가져오기
+        clothes = closet.get_ai_ready_clothes(user_id)
 
         if not clothes:
             return jsonify({
@@ -231,7 +240,7 @@ def recommend():
                 "error": "옷장이 비어있습니다. /api/clothes/add로 옷을 추가해주세요."
             }), 400
 
-        # fashion_ai.FashionRecommendationAI 가 기대하는 포맷에 맞게 dict 리스트 그대로 전달
+        # FashionRecommendationAI가 기대하는 포맷에 맞게 전달
         result = ai.recommend(
             clothes=clothes,
             weather=weather,
